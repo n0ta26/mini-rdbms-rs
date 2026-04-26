@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: ./infra/Dockerfile
+
+    container_name: mini-rdbms-rs-app
+
+    volumes:
+      - .:/workspace
+      - cargo-registry:/user/local/cargo/registry
+      - cargo-git:/user/local/cargo/git
+      - target-cache:/workspace/target
+
+    # DevContainerの時は-itはMustではないが、ローカルでdocker-composeを使うときは-itがMust
+    stdin_open: true
+    tty: true
+
+volumes:
+  cargo-registry:
+  cargo-git:
+  target-cache:
