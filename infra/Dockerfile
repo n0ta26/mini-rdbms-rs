@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     pkg-config \
     libssl-dev \
+    # イメージサイズを小さくするため、aptのキャッシュを削除
     && rm -rf /var/lib/apt/lists/*
 
 RUN rustup component add rustfmt clippy
