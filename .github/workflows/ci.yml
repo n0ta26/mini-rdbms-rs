@@ -26,7 +26,7 @@ jobs:
           rustfmt --version
 
       - name: Check formatting
-        run: cargo fmt --check
+        run: cargo fmt --all -- --check
 
       - name: Build
         run: cargo build
