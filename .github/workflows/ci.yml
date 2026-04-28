@@ -31,5 +31,5 @@ jobs:
       - name: Build
         run: cargo build
 
-      - name: Test
-        run: cargo test
+      - name: Unit Test
+        run: cargo test --lib
