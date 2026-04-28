@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  rust-ci:
+    name: Rust CI on Debian trixie
+
+    runs-on: ubuntu-latest
+
+    container:
+      image: rust:slim-trixie
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      - name: Show Rust versions
+        run: |
+          rustc --version
+          cargo --version
+          rustfmt --version
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Build
+        run: cargo build
+
+      - name: Unit Test
+        run: cargo test --lib
+      
+      - name: Integration Test
+        run: cargo test --tests
+
+      - name: Documentation Test
+        run: cargo test --doc
