@@ -36,3 +36,6 @@ jobs:
       
       - name: Integration Test
         run: cargo test --tests
+
+      - name: Documentation Test
+        run: cargo test --doc
