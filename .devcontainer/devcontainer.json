@@ -1,0 +1,29 @@
+{
+    "name": "mini-rdbms-rs-dev",
+    "dockerComposeFile": "../compose.yaml",
+    "service": "app",
+    "workspaceFolder": "/workspace",
+    "shutdownAction": "stopCompose",
+    "postCreateCommand": "rustc --version && cargo --version && cargo fmt --version && cargo clippy --version",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "ms-azuretools.vscode-docker"
+            ],
+            "settings": {
+                "rust-analyzer.check.command": "clippy",
+                "editor.formatOnSave": true,
+                "[rust]": {
+                    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+                },
+                "search.exclude": {
+                    "**/target": true
+                },
+                "files.watcherExclude": {
+                    "**/target/**": true
+                }
+            }
+        }
+    }
+}
