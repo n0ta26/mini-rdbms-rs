@@ -109,36 +109,63 @@ mod tests {
     use super::*;
     use crate::storage::error::StorageError;
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
+    use std::process;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn test_file_path(file_name: &str) -> PathBuf {
-        std::env::temp_dir().join(file_name)
+    struct TestFile {
+        path: PathBuf,
     }
 
-    fn remove_test_file(path: &Path) {
-        let _ = fs::remove_file(path);
+    impl TestFile {
+        fn new(test_name: &str) -> Self {
+            static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+
+            let unique_id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos();
+            let file_name = format!(
+                "mini_rdbms_{test_name}_{}_{}_{}.db",
+                process::id(),
+                timestamp,
+                unique_id
+            );
+
+            Self {
+                path: std::env::temp_dir().join(file_name),
+            }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TestFile {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.path);
+        }
     }
 
     #[test]
 
     fn open_creates_file_if_not_exists() {
-        let path = test_file_path("mini_rdbms_open_creates_file_if_not_exists.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_open_creates_file_if_not_exists.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path);
 
         assert!(storage.is_ok());
         assert!(path.exists());
-
-        remove_test_file(&path);
     }
 
     #[test]
     fn new_file_is_empty() {
-        let path = test_file_path("mini_rdbms_new_file_is_empty.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_new_file_is_empty.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
@@ -149,16 +176,13 @@ mod tests {
         assert!(is_empty);
 
         assert_eq!(storage.len().expect("failed to get file length"), 0);
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn write_all_at_writes_data_at_offset() {
-        let path = test_file_path("mini_rdbms_write_all_at_writes_data_at_offset.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_write_all_at_writes_data_at_offset.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
@@ -173,16 +197,14 @@ mod tests {
             .expect("failed to read data");
 
         assert_eq!(&buf, b"hello");
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn write_all_at_can_write_data_to_non_zero_offset() {
-        let path = test_file_path("mini_rdbms_write_all_at_can_write_data_to_non_zero_offset.db");
-
-        remove_test_file(&path);
+        let test_file =
+            TestFile::new("mini_rdbms_write_all_at_can_write_data_to_non_zero_offset.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
@@ -197,16 +219,13 @@ mod tests {
             .expect("failed to read data");
 
         assert_eq!(&buf, b"page");
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn write_all_at_extends_file_size() {
-        let path = test_file_path("mini_rdbms_write_all_at_extends_file_size.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_write_all_at_extends_file_size.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
@@ -217,16 +236,13 @@ mod tests {
         let len = storage.len().expect("failed to get file length");
 
         assert_eq!(len, 105);
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn read_exact_at_reads_exact_size() {
-        let path = test_file_path("mini_rdbms_read_exact_at_reads_exact_size.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_read_exact_at_reads_exact_size.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
@@ -241,16 +257,13 @@ mod tests {
             .expect("failed to read data");
 
         assert_eq!(&buf, b"cde");
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn read_exact_at_returns_unexpected_eof_when_short_read() {
-        let path = test_file_path("mini_rdbms_read_exact_at_returns_unexpected_eof.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_read_exact_at_returns_unexpected_eof.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
@@ -271,17 +284,14 @@ mod tests {
                 actual: 3,
             })
         ));
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn read_exact_at_returns_unexpected_eof_when_offset_is_beyond_file_size() {
-        let path =
-            test_file_path("mini_rdbms_read_exact_at_returns_eof_when_offset_is_beyond_size.db");
-
-        remove_test_file(&path);
+        let test_file =
+            TestFile::new("mini_rdbms_read_exact_at_returns_eof_when_offset_is_beyond_size.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
@@ -303,16 +313,13 @@ mod tests {
                 actual: 0,
             })
         ));
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn truncate_can_shrink_file() {
-        let path = test_file_path("mini_rdbms_truncate_can_shrink_file.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_truncate_can_shrink_file.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
@@ -331,32 +338,26 @@ mod tests {
             .expect("failed to read data");
 
         assert_eq!(&buf, b"abc");
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn truncate_can_extend_file() {
-        let path = test_file_path("mini_rdbms_truncate_can_extend_file.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_truncate_can_extend_file.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
         storage.truncate(4096).expect("failed to extend file");
 
         assert_eq!(storage.len().expect("failed to get file length"), 4096);
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn sync_all_succeeds_after_write() {
-        let path = test_file_path("mini_rdbms_sync_all_succeeds_after_write.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_sync_all_succeeds_after_write.db");
+        let path = test_file.path();
 
         let storage = FileStorage::open(&path).expect("failed to open file storage");
 
@@ -367,16 +368,13 @@ mod tests {
         let result = storage.sync();
 
         assert!(result.is_ok());
-
-        remove_test_file(&path);
     }
 
     #[test]
 
     fn data_can_be_read_after_reopening_file() {
-        let path = test_file_path("mini_rdbms_data_can_be_read_after_reopening_file.db");
-
-        remove_test_file(&path);
+        let test_file = TestFile::new("mini_rdbms_data_can_be_read_after_reopening_file.db");
+        let path = test_file.path();
 
         {
             let storage = FileStorage::open(&path).expect("failed to open file storage");
@@ -397,7 +395,5 @@ mod tests {
             .expect("failed to read data after reopening");
 
         assert_eq!(&buf, b"persisted");
-
-        remove_test_file(&path);
     }
 }
