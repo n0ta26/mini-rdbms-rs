@@ -157,7 +157,7 @@ mod tests {
         let test_file = TestFile::new("mini_rdbms_open_creates_file_if_not_exists.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path);
+        let storage = FileStorage::open(path);
 
         assert!(storage.is_ok());
         assert!(path.exists());
@@ -168,7 +168,7 @@ mod tests {
         let test_file = TestFile::new("mini_rdbms_new_file_is_empty.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         let is_empty = storage
             .is_empty()
@@ -185,7 +185,7 @@ mod tests {
         let test_file = TestFile::new("mini_rdbms_write_all_at_writes_data_at_offset.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         storage
             .write_exact_at(0, b"hello")
@@ -207,7 +207,7 @@ mod tests {
             TestFile::new("mini_rdbms_write_all_at_can_write_data_to_non_zero_offset.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         storage
             .write_exact_at(100, b"page")
@@ -228,7 +228,7 @@ mod tests {
         let test_file = TestFile::new("mini_rdbms_write_all_at_extends_file_size.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         storage
             .write_exact_at(100, b"hello")
@@ -245,7 +245,7 @@ mod tests {
         let test_file = TestFile::new("mini_rdbms_read_exact_at_reads_exact_size.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         storage
             .write_exact_at(0, b"abcdef")
@@ -266,7 +266,7 @@ mod tests {
         let test_file = TestFile::new("mini_rdbms_read_exact_at_returns_unexpected_eof.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         storage
             .write_exact_at(0, b"abc")
@@ -294,7 +294,7 @@ mod tests {
             TestFile::new("mini_rdbms_read_exact_at_returns_eof_when_offset_is_beyond_size.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         storage
             .write_exact_at(0, b"abc")
@@ -322,7 +322,7 @@ mod tests {
         let test_file = TestFile::new("mini_rdbms_truncate_can_shrink_file.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         storage
             .write_exact_at(0, b"abcdef")
@@ -347,7 +347,7 @@ mod tests {
         let test_file = TestFile::new("mini_rdbms_truncate_can_extend_file.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         storage.truncate(4096).expect("failed to extend file");
 
@@ -360,7 +360,7 @@ mod tests {
         let test_file = TestFile::new("mini_rdbms_sync_all_succeeds_after_write.db");
         let path = test_file.path();
 
-        let storage = FileStorage::open(&path).expect("failed to open file storage");
+        let storage = FileStorage::open(path).expect("failed to open file storage");
 
         storage
             .write_exact_at(0, b"durable")
@@ -378,7 +378,7 @@ mod tests {
         let path = test_file.path();
 
         {
-            let storage = FileStorage::open(&path).expect("failed to open file storage");
+            let storage = FileStorage::open(path).expect("failed to open file storage");
 
             storage
                 .write_exact_at(0, b"persisted")
@@ -387,7 +387,7 @@ mod tests {
             storage.sync().expect("failed to sync file");
         }
 
-        let reopened_storage = FileStorage::open(&path).expect("failed to reopen file storage");
+        let reopened_storage = FileStorage::open(path).expect("failed to reopen file storage");
 
         let mut buf = [0_u8; 9];
 
