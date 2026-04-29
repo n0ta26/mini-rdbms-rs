@@ -1,4 +1,5 @@
 use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use std::os::unix::fs::FileExt;
@@ -17,6 +18,7 @@ impl FileStorage {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(&path)?;
 
         Ok(FileStorage {
@@ -82,7 +84,8 @@ impl StorageEngine for FileStorage {
     }
 
     fn flush(&self) -> StorageResult<()> {
-        self.file.flush()?;
+        let mut file = &self.file;
+        file.flush()?;
         Ok(())
     }
 
