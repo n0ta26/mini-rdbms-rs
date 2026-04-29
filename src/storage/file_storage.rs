@@ -104,3 +104,301 @@ impl StorageEngine for FileStorage {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::error::StorageError;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn test_file_path(file_name: &str) -> PathBuf {
+        std::env::temp_dir().join(file_name)
+    }
+
+    fn remove_test_file(path: &Path) {
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+
+    fn open_creates_file_if_not_exists() {
+        let path = test_file_path("mini_rdbms_open_creates_file_if_not_exists.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path);
+
+        assert!(storage.is_ok());
+        assert!(path.exists());
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+    fn new_file_is_empty() {
+        let path = test_file_path("mini_rdbms_new_file_is_empty.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        let is_empty = storage
+            .is_empty()
+            .expect("failed to check whether storage is empty");
+
+        assert!(is_empty);
+
+        assert_eq!(storage.len().expect("failed to get file length"), 0);
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn write_all_at_writes_data_at_offset() {
+        let path = test_file_path("mini_rdbms_write_all_at_writes_data_at_offset.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        storage
+            .write_exact_at(0, b"hello")
+            .expect("failed to write data");
+
+        let mut buf = [0_u8; 5];
+
+        storage
+            .read_exact_at(0, &mut buf)
+            .expect("failed to read data");
+
+        assert_eq!(&buf, b"hello");
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn write_all_at_can_write_data_to_non_zero_offset() {
+        let path = test_file_path("mini_rdbms_write_all_at_can_write_data_to_non_zero_offset.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        storage
+            .write_exact_at(100, b"page")
+            .expect("failed to write data");
+
+        let mut buf = [0_u8; 4];
+
+        storage
+            .read_exact_at(100, &mut buf)
+            .expect("failed to read data");
+
+        assert_eq!(&buf, b"page");
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn write_all_at_extends_file_size() {
+        let path = test_file_path("mini_rdbms_write_all_at_extends_file_size.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        storage
+            .write_exact_at(100, b"hello")
+            .expect("failed to write data");
+
+        let len = storage.len().expect("failed to get file length");
+
+        assert_eq!(len, 105);
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn read_exact_at_reads_exact_size() {
+        let path = test_file_path("mini_rdbms_read_exact_at_reads_exact_size.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        storage
+            .write_exact_at(0, b"abcdef")
+            .expect("failed to write data");
+
+        let mut buf = [0_u8; 3];
+
+        storage
+            .read_exact_at(2, &mut buf)
+            .expect("failed to read data");
+
+        assert_eq!(&buf, b"cde");
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn read_exact_at_returns_unexpected_eof_when_short_read() {
+        let path = test_file_path("mini_rdbms_read_exact_at_returns_unexpected_eof.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        storage
+            .write_exact_at(0, b"abc")
+            .expect("failed to write data");
+
+        let mut buf = [0_u8; 10];
+
+        let result = storage.read_exact_at(0, &mut buf);
+
+        println!("Result: {:?}", result);
+        assert!(matches!(
+            result,
+            Err(StorageError::Unexpected {
+                offset: 0,
+                expected: 10,
+                actual: 3,
+            })
+        ));
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn read_exact_at_returns_unexpected_eof_when_offset_is_beyond_file_size() {
+        let path =
+            test_file_path("mini_rdbms_read_exact_at_returns_eof_when_offset_is_beyond_size.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        storage
+            .write_exact_at(0, b"abc")
+            .expect("failed to write data");
+
+        let mut buf = [0_u8; 1];
+
+        let result = storage.read_exact_at(100, &mut buf);
+
+        assert!(matches!(
+            result,
+            Err(StorageError::Unexpected {
+                offset: 100,
+
+                expected: 1,
+
+                actual: 0,
+            })
+        ));
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn truncate_can_shrink_file() {
+        let path = test_file_path("mini_rdbms_truncate_can_shrink_file.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        storage
+            .write_exact_at(0, b"abcdef")
+            .expect("failed to write data");
+
+        storage.truncate(3).expect("failed to truncate file");
+
+        assert_eq!(storage.len().expect("failed to get file length"), 3);
+
+        let mut buf = [0_u8; 3];
+
+        storage
+            .read_exact_at(0, &mut buf)
+            .expect("failed to read data");
+
+        assert_eq!(&buf, b"abc");
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn truncate_can_extend_file() {
+        let path = test_file_path("mini_rdbms_truncate_can_extend_file.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        storage.truncate(4096).expect("failed to extend file");
+
+        assert_eq!(storage.len().expect("failed to get file length"), 4096);
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn sync_all_succeeds_after_write() {
+        let path = test_file_path("mini_rdbms_sync_all_succeeds_after_write.db");
+
+        remove_test_file(&path);
+
+        let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+        storage
+            .write_exact_at(0, b"durable")
+            .expect("failed to write data");
+
+        let result = storage.sync();
+
+        assert!(result.is_ok());
+
+        remove_test_file(&path);
+    }
+
+    #[test]
+
+    fn data_can_be_read_after_reopening_file() {
+        let path = test_file_path("mini_rdbms_data_can_be_read_after_reopening_file.db");
+
+        remove_test_file(&path);
+
+        {
+            let storage = FileStorage::open(&path).expect("failed to open file storage");
+
+            storage
+                .write_exact_at(0, b"persisted")
+                .expect("failed to write data");
+
+            storage.sync().expect("failed to sync file");
+        }
+
+        let reopened_storage = FileStorage::open(&path).expect("failed to reopen file storage");
+
+        let mut buf = [0_u8; 9];
+
+        reopened_storage
+            .read_exact_at(0, &mut buf)
+            .expect("failed to read data after reopening");
+
+        assert_eq!(&buf, b"persisted");
+
+        remove_test_file(&path);
+    }
+}
