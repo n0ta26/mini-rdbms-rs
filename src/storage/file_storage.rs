@@ -31,7 +31,7 @@ impl FileStorage {
         &self.path
     }
 
-    fn read_exact_loop(&self, mut offset: u64, mut buf: &mut [u8]) -> StorageResult<()> {
+    fn read_exact_loop(&self, offset: u64, buf: &mut [u8]) -> StorageResult<()> {
         let mut total_read = 0;
 
         while total_read < buf.len() {
@@ -52,7 +52,7 @@ impl FileStorage {
         Ok(())
     }
 
-    fn write_exact_loop(&self, mut offset: u64, mut buf: &[u8]) -> StorageResult<()> {
+    fn write_exact_loop(&self, offset: u64, buf: &[u8]) -> StorageResult<()> {
         let mut total_written = 0;
 
         while total_written < buf.len() {
