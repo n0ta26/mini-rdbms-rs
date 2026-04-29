@@ -18,7 +18,6 @@ impl FileStorage {
             .read(true)
             .write(true)
             .create(true)
-            .truncate(true)
             .open(&path)?;
 
         Ok(FileStorage {
@@ -42,8 +41,8 @@ impl FileStorage {
 
             if read_size == 0 {
                 return Err(StorageError::Unexpected {
-                    offset: current_offset,
-                    expected: target.len(),
+                    offset,
+                    expected: buf.len(),
                     actual: total_read,
                 });
             }
