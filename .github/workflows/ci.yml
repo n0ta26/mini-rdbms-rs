@@ -24,6 +24,7 @@ jobs:
           rustc --version
           cargo --version
           rustfmt --version
+          cargo clippy --version
 
       - name: Check formatting
         run: cargo fmt --all -- --check
