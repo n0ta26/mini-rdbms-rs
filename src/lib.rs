@@ -1,3 +1,4 @@
+pub mod disk;
 pub mod storage;
 
 #[cfg(test)]

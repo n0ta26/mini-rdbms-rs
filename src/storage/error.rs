@@ -11,6 +11,10 @@ pub enum StorageError {
         expected: usize,
         actual: usize,
     },
+    // This variant represents an invalid argument error, which can occur when the input parameters for a storage operation are not valid. The `message` field provides a descriptive error message explaining the nature of the invalid argument.
+    InvalidArgument {
+        message: String,
+    },
 }
 
 /// This is a type alias for `Result<T, StorageError>`, providing a convenient way to handle results from storage operations.
@@ -38,6 +42,9 @@ impl fmt::Display for StorageError {
                     "Unexpected data at offset {}: expected {} bytes, got {} bytes",
                     offset, expected, actual
                 )
+            }
+            StorageError::InvalidArgument { message } => {
+                write!(f, "Invalid argument: {}", message)
             }
         }
     }
