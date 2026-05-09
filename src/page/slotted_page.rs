@@ -366,3 +366,315 @@ fn read_u64(buf: &[u8], offset: usize) -> u64 {
 fn write_u64(buf: &mut [u8], offset: usize, value: u64) {
     buf[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::disk::DEFAULT_PAGE_SIZE;
+
+    fn new_test_page() -> Vec<u8> {
+        vec![0_u8; DEFAULT_PAGE_SIZE]
+    }
+
+    fn initialized_table_leaf_page() -> Vec<u8> {
+        let manager = SlottedPageManager::new();
+        let mut page = new_test_page();
+
+        manager
+            .init_page(&mut page, 1, PageType::TableLeaf)
+            .expect("failed to initialize test page");
+
+        page
+    }
+
+    #[test]
+    fn init_page_initializes_table_leaf_page() {
+        let manager = SlottedPageManager::new();
+        let mut page = new_test_page();
+
+        manager
+            .init_page(&mut page, 1, PageType::TableLeaf)
+            .expect("failed to initialize page");
+
+        let header = manager
+            .read_header(&page)
+            .expect("failed to read page header");
+
+        assert_eq!(header.page_id, 1);
+        assert_eq!(header.page_type, PageType::TableLeaf);
+        assert_eq!(header.slot_count, 0);
+        assert_eq!(header.free_start, PAGE_HEADER_SIZE as u16);
+        assert_eq!(header.free_end, DEFAULT_PAGE_SIZE as u16);
+        assert_eq!(header.next_page_id, None);
+    }
+
+    #[test]
+    fn page_type_returns_initialized_page_type() {
+        let manager = SlottedPageManager::new();
+        let page = initialized_table_leaf_page();
+
+        let page_type = manager.page_type(&page).expect("failed to read page type");
+
+        assert_eq!(page_type, PageType::TableLeaf);
+    }
+
+    #[test]
+    fn free_space_size_returns_page_capacity_after_init() {
+        let manager = SlottedPageManager::new();
+        let page = initialized_table_leaf_page();
+
+        let free_space_size = manager
+            .free_space_size(&page)
+            .expect("failed to calculate free space size");
+
+        assert_eq!(free_space_size, DEFAULT_PAGE_SIZE - PAGE_HEADER_SIZE);
+    }
+
+    #[test]
+    fn insert_record_stores_record_and_returns_slot_id() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        let slot_id = manager
+            .insert_record(&mut page, b"hello")
+            .expect("failed to insert record");
+
+        assert_eq!(slot_id, 0);
+
+        let record = manager
+            .read_record(&page, slot_id)
+            .expect("failed to read inserted record");
+
+        assert_eq!(record, b"hello");
+    }
+
+    #[test]
+    fn insert_multiple_records_returns_different_slot_ids() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        let first_slot_id = manager
+            .insert_record(&mut page, b"first")
+            .expect("failed to insert first record");
+
+        let second_slot_id = manager
+            .insert_record(&mut page, b"second")
+            .expect("failed to insert second record");
+
+        assert_eq!(first_slot_id, 0);
+        assert_eq!(second_slot_id, 1);
+        assert_ne!(first_slot_id, second_slot_id);
+
+        let first_record = manager
+            .read_record(&page, first_slot_id)
+            .expect("failed to read first record");
+
+        let second_record = manager
+            .read_record(&page, second_slot_id)
+            .expect("failed to read second record");
+
+        assert_eq!(first_record, b"first");
+        assert_eq!(second_record, b"second");
+    }
+
+    #[test]
+    fn insert_record_updates_free_space_size() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        let before = manager
+            .free_space_size(&page)
+            .expect("failed to calculate free space before insert");
+
+        manager
+            .insert_record(&mut page, b"hello")
+            .expect("failed to insert record");
+
+        let after = manager
+            .free_space_size(&page)
+            .expect("failed to calculate free space after insert");
+
+        assert_eq!(before - after, SLOT_SIZE + b"hello".len());
+    }
+
+    #[test]
+    fn read_record_rejects_invalid_slot_id() {
+        let manager = SlottedPageManager::new();
+        let page = initialized_table_leaf_page();
+
+        let result = manager.read_record(&page, 0);
+
+        assert!(matches!(
+            result,
+            Err(PageError::InvalidSlotId {
+                slot_id: 0,
+                slot_count: 0,
+            })
+        ));
+    }
+
+    #[test]
+    fn delete_record_marks_slot_as_deleted() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        let slot_id = manager
+            .insert_record(&mut page, b"hello")
+            .expect("failed to insert record");
+
+        manager
+            .delete_record(&mut page, slot_id)
+            .expect("failed to delete record");
+
+        let slot = manager
+            .read_slot(&page, slot_id)
+            .expect("failed to read slot");
+
+        assert_eq!(slot.flags, SLOT_FLAG_DELETED);
+    }
+
+    #[test]
+    fn read_record_rejects_deleted_slot() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        let slot_id = manager
+            .insert_record(&mut page, b"hello")
+            .expect("failed to insert record");
+
+        manager
+            .delete_record(&mut page, slot_id)
+            .expect("failed to delete record");
+
+        let result = manager.read_record(&page, slot_id);
+
+        assert!(matches!(result, Err(PageError::DeletedSlot { slot_id: 0 })));
+    }
+
+    #[test]
+    fn delete_record_rejects_deleted_slot() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        let slot_id = manager
+            .insert_record(&mut page, b"hello")
+            .expect("failed to insert record");
+
+        manager
+            .delete_record(&mut page, slot_id)
+            .expect("failed to delete record");
+
+        let result = manager.delete_record(&mut page, slot_id);
+
+        assert!(matches!(result, Err(PageError::DeletedSlot { slot_id: 0 })));
+    }
+
+    #[test]
+    fn insert_record_returns_not_enough_space_when_page_is_full() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        let available = manager
+            .free_space_size(&page)
+            .expect("failed to calculate free space");
+
+        let too_large_record = vec![1_u8; available];
+
+        let result = manager.insert_record(&mut page, &too_large_record);
+
+        assert!(matches!(
+            result,
+            Err(PageError::NotEnoughSpace {
+                required,
+                available: actual_available,
+            }) if required == SLOT_SIZE + too_large_record.len()
+                && actual_available == available
+        ));
+    }
+
+    #[test]
+    fn init_page_rejects_too_small_page() {
+        let manager = SlottedPageManager::new();
+
+        let mut page = vec![0_u8; PAGE_HEADER_SIZE + SLOT_SIZE - 1];
+
+        let result = manager.init_page(&mut page, 1, PageType::TableLeaf);
+
+        assert!(matches!(
+            result,
+            Err(PageError::InvalidPageSize {
+                expected_min,
+                actual,
+            }) if expected_min == PAGE_HEADER_SIZE + SLOT_SIZE
+                && actual == PAGE_HEADER_SIZE + SLOT_SIZE - 1
+        ));
+    }
+
+    #[test]
+    fn invalid_magic_returns_invalid_magic_error() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        page[0] = 0x00;
+        page[1] = 0x00;
+
+        let result = manager.page_type(&page);
+
+        assert!(matches!(result, Err(PageError::InvalidMagic { actual: 0 })));
+    }
+
+    #[test]
+    fn invalid_page_type_returns_invalid_page_type_error() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        page[10] = 255;
+
+        let result = manager.page_type(&page);
+
+        assert!(matches!(
+            result,
+            Err(PageError::InvalidPageType { actual: 255 })
+        ));
+    }
+
+    #[test]
+    fn read_record_detects_corrupted_record_range() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        let slot_id = manager
+            .insert_record(&mut page, b"hello")
+            .expect("failed to insert record");
+
+        let mut slot = manager
+            .read_slot(&page, slot_id)
+            .expect("failed to read slot");
+
+        slot.offset = (DEFAULT_PAGE_SIZE - 2) as u16;
+
+        manager
+            .write_slot(&mut page, slot_id, &slot)
+            .expect("failed to write corrupted slot");
+
+        let result = manager.read_record(&page, slot_id);
+
+        assert!(matches!(result, Err(PageError::CorruptedPage { .. })));
+    }
+
+    #[test]
+    fn insert_record_can_store_empty_record() {
+        let manager = SlottedPageManager::new();
+        let mut page = initialized_table_leaf_page();
+
+        let slot_id = manager
+            .insert_record(&mut page, b"")
+            .expect("failed to insert empty record");
+
+        let record = manager
+            .read_record(&page, slot_id)
+            .expect("failed to read empty record");
+
+        assert_eq!(record, b"");
+    }
+}
