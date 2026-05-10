@@ -11,7 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 type TestDiskManager = StorageDiskManager<FileStorage>;
 type TestBufferManager = LruBufferManager<TestDiskManager>;
-type TestAccessMethod = HeapAccessMethod<BufferPoolPageAccessor<TestBufferManager>, SlottedPageManager>;
+type TestAccessMethod =
+    HeapAccessMethod<BufferPoolPageAccessor<TestBufferManager>, SlottedPageManager>;
 
 struct TestFile {
     path: PathBuf,
@@ -74,7 +75,9 @@ fn heap_access_method_round_trip_through_storage_stack() {
         .insert(b"hello-from-access-method")
         .expect("failed to insert record");
 
-    let record = access_method.read(record_id).expect("failed to read record");
+    let record = access_method
+        .read(record_id)
+        .expect("failed to read record");
     assert_eq!(record, b"hello-from-access-method");
 
     access_method
