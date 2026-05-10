@@ -127,3 +127,174 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::disk::{DEFAULT_PAGE_SIZE, PageId};
+    use crate::page::{PageError, SlottedPageManager};
+    use std::collections::HashMap;
+
+    #[derive(Debug)]
+    struct InMemoryPageAccessor {
+        pages: HashMap<PageId, Vec<u8>>,
+        next_page_id: PageId,
+        page_size: usize,
+    }
+
+    impl InMemoryPageAccessor {
+        fn new(page_size: usize) -> Self {
+            Self {
+                pages: HashMap::new(),
+                next_page_id: 0,
+                page_size,
+            }
+        }
+    }
+
+    impl PageAccessor for InMemoryPageAccessor {
+        fn allocate_page(&mut self) -> AccessResult<PageId> {
+            let page_id = self.next_page_id;
+            self.next_page_id += 1;
+
+            self.pages.insert(page_id, vec![0_u8; self.page_size]);
+
+            Ok(page_id)
+        }
+
+        fn read_page(&self, page_id: PageId) -> AccessResult<Vec<u8>> {
+            self.pages
+                .get(&page_id)
+                .cloned()
+                .ok_or(AccessError::PageNotFound { page_id })
+        }
+
+        fn write_page(&mut self, page_id: PageId, page: &[u8]) -> AccessResult<()> {
+            if !self.pages.contains_key(&page_id) {
+                return Err(AccessError::PageNotFound { page_id });
+            }
+
+            self.pages.insert(page_id, page.to_vec());
+
+            Ok(())
+        }
+
+        fn page_size(&self) -> usize {
+            self.page_size
+        }
+    }
+
+    fn new_heap_access_method() -> HeapAccessMethod<InMemoryPageAccessor, SlottedPageManager> {
+        HeapAccessMethod::new(
+            InMemoryPageAccessor::new(DEFAULT_PAGE_SIZE),
+            SlottedPageManager::new(),
+        )
+    }
+
+    #[test]
+    fn insert_stores_record_and_returns_record_id() {
+        let mut access_method = new_heap_access_method();
+
+        let record_id = access_method
+            .insert(b"hello")
+            .expect("failed to insert record");
+
+        assert_eq!(record_id.page_id(), 0);
+        assert_eq!(record_id.slot_id(), 0);
+        assert_eq!(access_method.page_ids(), &[0]);
+    }
+
+    #[test]
+    fn read_returns_inserted_record() {
+        let mut access_method = new_heap_access_method();
+
+        let record_id = access_method
+            .insert(b"hello")
+            .expect("failed to insert record");
+
+        let record = access_method
+            .read(record_id)
+            .expect("failed to read record");
+
+        assert_eq!(record, b"hello");
+    }
+
+    #[test]
+    fn insert_multiple_records_into_same_page() {
+        let mut access_method = new_heap_access_method();
+
+        let first_record_id = access_method
+            .insert(b"first")
+            .expect("failed to insert first record");
+
+        let second_record_id = access_method
+            .insert(b"second")
+            .expect("failed to insert second record");
+
+        assert_eq!(first_record_id.page_id(), second_record_id.page_id());
+        assert_ne!(first_record_id.slot_id(), second_record_id.slot_id());
+
+        assert_eq!(
+            access_method
+                .read(first_record_id)
+                .expect("failed to read first record"),
+            b"first"
+        );
+
+        assert_eq!(
+            access_method
+                .read(second_record_id)
+                .expect("failed to read second record"),
+            b"second"
+        );
+    }
+
+    #[test]
+    fn delete_marks_record_as_deleted() {
+        let mut access_method = new_heap_access_method();
+
+        let record_id = access_method
+            .insert(b"hello")
+            .expect("failed to insert record");
+
+        access_method
+            .delete(record_id)
+            .expect("failed to delete record");
+
+        let result = access_method.read(record_id);
+
+        assert!(matches!(
+            result,
+            Err(AccessError::Page(PageError::DeletedSlot { slot_id: 0 }))
+        ));
+    }
+
+    #[test]
+    fn read_returns_page_not_found_when_page_does_not_exist() {
+        let access_method = new_heap_access_method();
+        let record_id = RecordId::new(999, 0);
+
+        let result = access_method.read(record_id);
+
+        assert!(matches!(
+            result,
+            Err(AccessError::PageNotFound { page_id: 999 })
+        ));
+    }
+
+    #[test]
+    fn insert_allocates_new_page_when_current_page_has_no_space() {
+        let mut access_method =
+            HeapAccessMethod::new(InMemoryPageAccessor::new(64), SlottedPageManager::new());
+
+        access_method
+            .insert(&[1_u8; 20])
+            .expect("failed to insert first record");
+
+        access_method
+            .insert(&[2_u8; 20])
+            .expect("failed to insert second record");
+
+        assert!(access_method.page_ids().len() >= 2);
+    }
+}
