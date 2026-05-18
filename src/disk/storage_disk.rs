@@ -89,7 +89,9 @@ where
 
         if len % page_size != 0 {
             return Err(StorageError::InvalidArgument {
-                message: format!("storage length is not page aligned: len={len}, page_size={page_size}"),
+                message: format!(
+                    "storage length is not page aligned: len={len}, page_size={page_size}"
+                ),
             });
         }
 
@@ -112,7 +114,9 @@ where
 
         if len % page_size != 0 {
             return Err(StorageError::InvalidArgument {
-                message: format!("storage length is not page aligned: len={len}, page_size={page_size}"),
+                message: format!(
+                    "storage length is not page aligned: len={len}, page_size={page_size}"
+                ),
             });
         }
 
