@@ -297,7 +297,7 @@ mod tests {
 
         let result = storage.read_exact_at(0, &mut buf);
 
-        println!("Result: {:?}", result);
+        println!("Result: {result:?}");
         assert!(matches!(
             result,
             Err(StorageError::Unexpected {

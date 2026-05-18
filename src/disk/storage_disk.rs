@@ -89,10 +89,7 @@ where
 
         if len % page_size != 0 {
             return Err(StorageError::InvalidArgument {
-                message: format!(
-                    "storage length is not page aligned: len={}, page_size={}",
-                    len, page_size
-                ),
+                message: format!("storage length is not page aligned: len={len}, page_size={page_size}"),
             });
         }
 
@@ -101,10 +98,7 @@ where
         let new_len = len
             .checked_add(page_size)
             .ok_or_else(|| StorageError::InvalidArgument {
-                message: format!(
-                    "storage length overflow: len={}, page_size={}",
-                    len, page_size
-                ),
+                message: format!("storage length overflow: len={len}, page_size={page_size}"),
             })?;
 
         self.storage.truncate(new_len)?;
@@ -118,10 +112,7 @@ where
 
         if len % page_size != 0 {
             return Err(StorageError::InvalidArgument {
-                message: format!(
-                    "storage length is not page aligned: len={}, page_size={}",
-                    len, page_size
-                ),
+                message: format!("storage length is not page aligned: len={len}, page_size={page_size}"),
             });
         }
 
