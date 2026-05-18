@@ -127,6 +127,9 @@ fn executor_returns_invalid_access_page_for_unknown_record_id() {
 
     assert!(matches!(
         result,
-        Err(ExecutorError::Access(AccessError::InvalidAccessPage { page_id: 999, .. }))
+        Err(ExecutorError::Access(AccessError::InvalidAccessPage {
+            page_id: 999,
+            ..
+        }))
     ));
 }
