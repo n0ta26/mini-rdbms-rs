@@ -70,7 +70,7 @@ where
         if page_type != PageType::TableLeaf {
             return Err(AccessError::InvalidAccessPage {
                 page_id,
-                message: format!("expected TableLeaf page, but got {:?}", page_type),
+                message: format!("expected TableLeaf page, but got {page_type:?}"),
             });
         }
 

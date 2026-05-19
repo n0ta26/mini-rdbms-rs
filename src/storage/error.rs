@@ -31,7 +31,7 @@ impl From<std::io::Error> for StorageError {
 impl fmt::Display for StorageError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StorageError::IoError(err) => write!(f, "Storage I/O error: {}", err),
+            StorageError::IoError(err) => write!(f, "Storage I/O error: {err}"),
             StorageError::Unexpected {
                 offset,
                 expected,
@@ -39,12 +39,11 @@ impl fmt::Display for StorageError {
             } => {
                 write!(
                     f,
-                    "Unexpected data at offset {}: expected {} bytes, got {} bytes",
-                    offset, expected, actual
+                    "Unexpected data at offset {offset}: expected {expected} bytes, got {actual} bytes"
                 )
             }
             StorageError::InvalidArgument { message } => {
-                write!(f, "Invalid argument: {}", message)
+                write!(f, "Invalid argument: {message}")
             }
         }
     }
