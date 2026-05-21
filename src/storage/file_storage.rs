@@ -123,53 +123,7 @@ impl StorageEngine for FileStorage {
 mod tests {
     use super::*;
     use crate::storage::error::StorageError;
-    use std::fs;
-    use std::path::{Path, PathBuf};
-    use std::process;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    /// This struct represents a temporary test file that is created for each test case. It generates a unique file name based on the test name, process ID, timestamp, and a unique ID to ensure that multiple tests can run concurrently without conflicts. The `Drop` implementation ensures that the file is removed from the filesystem when the `TestFile` instance goes out of scope, preventing clutter and ensuring that temporary files do not persist after tests are completed.
-    struct TestFile {
-        path: PathBuf,
-    }
-
-    /// This implementation provides a constructor for creating a new `TestFile` instance with a unique file name based on the test name, process ID, timestamp, and a unique ID. The `path` method allows access to the file path for use in tests.
-    impl TestFile {
-        /// This method generates a unique file name for the test file based on the provided test name, the current process ID, a timestamp, and a unique ID. It ensures that each test file has a distinct name to avoid conflicts when multiple tests are run concurrently. The generated file is located in the system's temporary directory.
-        fn new(test_name: &str) -> Self {
-            static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
-
-            let unique_id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-            let timestamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("system time should be after unix epoch")
-                .as_nanos();
-            let file_name = format!(
-                "mini_rdbms_{test_name}_{}_{}_{}.db",
-                process::id(),
-                timestamp,
-                unique_id
-            );
-
-            Self {
-                path: std::env::temp_dir().join(file_name),
-            }
-        }
-
-        /// This method returns the path of the test file, allowing tests to access the file for reading and writing operations.
-        fn path(&self) -> &Path {
-            &self.path
-        }
-    }
-
-    /// This implementation ensures that the test file is removed from the filesystem when the `TestFile` instance goes out of scope. The `drop` method attempts to remove the file, and any errors during removal are ignored (e.g., if the file does not exist or cannot be removed for some reason). This helps to keep the filesystem clean and prevents temporary files from persisting after tests are completed.
-    impl Drop for TestFile {
-        /// This method is called when the `TestFile` instance goes out of scope. It attempts to remove the file from the filesystem using `fs::remove_file`. Any errors that occur during file removal are ignored, ensuring that the test does not fail due to issues with file cleanup.
-        fn drop(&mut self) {
-            let _ = fs::remove_file(&self.path);
-        }
-    }
+    use crate::test_utils::TestFile;
 
     /// This test verifies that opening a file with `FileStorage::open` creates the file if it does not already exist. It uses the `TestFile` struct to generate a unique temporary file path, attempts to open the file using `FileStorage`, and then checks that the operation was successful and that the file now exists on the filesystem.
     #[test]
