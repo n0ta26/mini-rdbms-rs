@@ -260,7 +260,7 @@ mod tests {
     use crate::buffer::BufferError;
     use crate::disk::StorageDiskManager;
     use crate::storage::FileStorage;
-    use crate::test_utils::TestFile;
+    use crate::util::TestFile;
 
     fn create_buffer_manager(
         test_name: &str,

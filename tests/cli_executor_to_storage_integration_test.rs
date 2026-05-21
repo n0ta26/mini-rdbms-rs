@@ -6,11 +6,8 @@ use mini_rdbms_rs::cli::executor::{
 use mini_rdbms_rs::disk::{PageId, StorageDiskManager};
 use mini_rdbms_rs::page::{PageError, SlottedPageManager};
 use mini_rdbms_rs::storage::FileStorage;
+use mini_rdbms_rs::util::TestFile;
 use std::path::Path;
-
-#[path = "../src/test_utils.rs"]
-mod test_utils;
-use test_utils::TestFile;
 
 type TestDiskManager = StorageDiskManager<FileStorage>;
 type TestBufferManager = LruBufferManager<TestDiskManager>;

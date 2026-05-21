@@ -136,7 +136,7 @@ where
 mod tests {
     use super::*;
     use crate::storage::{FileStorage, StorageError};
-    use crate::test_utils::TestFile;
+    use crate::util::TestFile;
 
     #[test]
     fn new_uses_default_page_size() {
